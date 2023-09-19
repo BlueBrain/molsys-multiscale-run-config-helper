@@ -14,5 +14,5 @@ This simple script allows to generate the following multiscale_run configuration
 
 # Usage
 ```bash
-prompt%> ./generate.py -c ./tests/data/ngv_config.json -o Test_output --neuron_population_name All
+prompt%> generate.py -c <circuit_file> -o <output_path> -f <filter_neuron> -n <neuron_population_name>
 ```
