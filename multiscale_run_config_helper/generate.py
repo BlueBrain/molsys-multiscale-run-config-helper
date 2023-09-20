@@ -13,13 +13,14 @@ import pandas as pd
 from bluepysnap import Circuit
 
 
-def extract_information(circuit_path:str, neuron_population_name:str, filter_neuron:bool):
+def extract_information(circuit_path:str, neuron_population_name:str, filter_neuron:bool, astrocyte_ids:np.array=None):
     """
     extract information from the circuit_config.json 
     :param circuit_path: path to the somata circuit json file (ngv_config.json)
     :param neuron_population_name: the sonata neuron population name
     :param filter_neuron: If True, the neuron ids will contain only the neuron that are connected to the astrocytes,
                          otherwise, the list will contain all the neurons ids
+    :param astrocyte_ids: np.array of shape (N,) that contains the list of astrocyte_ids to use for the simulation
     :return:
         tuple:
         neuro_df: pandas dataframe with all selected neuron infromation
@@ -27,19 +28,24 @@ def extract_information(circuit_path:str, neuron_population_name:str, filter_neu
         selected_astrocytes
     """
     c = Circuit(circuit_path)
-
-    # Create a list of astrocyte ids, that contains all the astrocytes with endfoot
     gliovascular = c.edges["gliovascular"]
     edges_ids = np.arange(gliovascular.size, dtype=np.uint64)
     df = gliovascular.get(edges_ids, ["@target_node", "endfoot_compartment_length"])
-    filtered_df = df[df.endfoot_compartment_length > 0]
-    selected_astrocytes = filtered_df["@target_node"].unique()
 
-    # Remove from thi list the astrocytes with at least one endfoot_compartment_length == 0.0
-    filtered_df = df[df.endfoot_compartment_length == 0]
-    astroytes_id_to_remove = filtered_df["@target_node"].to_numpy()
-    indices_to_remove = np.where(np.in1d(selected_astrocytes, astroytes_id_to_remove))[0]
-    selected_astrocytes = np.delete(selected_astrocytes, indices_to_remove)
+
+    if astrocyte_ids is not None:
+        selected_astrocytes = astrocyte_ids
+        print(f'INFO User input astrocyte ids: {selected_astrocytes}')
+    else:
+        # Create a list of astrocyte ids, that contains all the astrocytes with endfoot
+        filtered_df = df[df.endfoot_compartment_length > 0]
+        selected_astrocytes = filtered_df["@target_node"].unique()
+
+        # Remove from thi list the astrocytes with at least one endfoot_compartment_length == 0.0
+        filtered_df = df[df.endfoot_compartment_length == 0]
+        astroytes_id_to_remove = filtered_df["@target_node"].to_numpy()
+        indices_to_remove = np.where(np.in1d(selected_astrocytes, astroytes_id_to_remove))[0]
+        selected_astrocytes = np.delete(selected_astrocytes, indices_to_remove)
     print(f'INFO: There are {selected_astrocytes.size} astrocytes with valid endfeet')
 
     if filter_neuron:
@@ -60,7 +66,8 @@ def extract_information(circuit_path:str, neuron_population_name:str, filter_neu
     return neuro_df, selected_neurons, selected_astrocytes
 
 
-def generate(circuit_path: str, output_path: str, neuron_population_name: str, filter_neuron: bool):
+def generate(circuit_path: str, output_path: str, neuron_population_name: str,
+             filter_neuron: bool, astrocyte_ids:np.array = None):
     """
     Generate the multiscale_run node_sets.json configuration file and the metabolism ones
     :param circuit_path: path to the somata circuit json file (ngv_config.json)
@@ -68,12 +75,13 @@ def generate(circuit_path: str, output_path: str, neuron_population_name: str, f
     :param neuron_population_name: the sonata neuron population name
     :param filter_neuron: If True, the neuron ids will contain only the neuron that are connected to the astrocytes,
                          otherwise, the list will contain all the neurons ids
+    :param astrocyte_ids: np.array of shape (N,) that contains the list of astrocyte_ids to use for the simulation
 
     :return: 
     """
-    
+
     neuro_df, selected_neurons, selected_astrocytes = (
-        extract_information(circuit_path, neuron_population_name, filter_neuron))
+        extract_information(circuit_path, neuron_population_name, filter_neuron, astrocyte_ids = astrocyte_ids))
     
     neuro_df = neuro_df.rename(columns={"population": "population_name"})
     neuro_df = neuro_df.reset_index(drop=False)
@@ -150,7 +158,8 @@ def msg_and_exit():
     print help message and exit
     :return:
     """
-    print("generate.py -c <circuit_file> -o <output_path> -f <filter_neuron> -n <neuron_population_name>")
+    print("generate.py -c <circuit_file> -o <output_path> -f <filter_neuron> "
+          "-n <neuron_population_name> -a <astrocyte_id_path>")
     sys.exit()
 
 def main(argv):
@@ -158,9 +167,13 @@ def main(argv):
     output_path = None
     filter_neuron = False
     neuron_population_name = 'All'
+    astrocyte_id_path = None
+    astrocyte_ids = None
     try:
-        opts, _ = getopt(argv, "hc:o:fn:", ["circuit_file=", "output_path=",
-                                                      "filter_neuron=", "neuron_population_name="])
+        opts, _ = getopt(argv, "hc:o:fn:a:", ["circuit_file=", "output_path=",
+                                             "filter_neuron=", "neuron_population_name=",
+                                             "astrocyte_id_path="
+                                             ])
 
         if len(opts) == 0:
             msg_and_exit()
@@ -173,12 +186,21 @@ def main(argv):
                 output_path = arg
             elif opt in ("-n", "--neuron_population_name"):
                 neuron_population_name = arg
+            elif opt in ("-a", "--astrocyte_id_path"):
+                astrocyte_id_path = arg
             elif opt in ("-f", "--filter_neuron"):
                 filter_neuron = True
+
+        if astrocyte_id_path:
+            astrocyte_ids = np.load(astrocyte_id_path)
+
+
         if circuit_path and output_path:
             print(f'INFO: generate( circuit_path:{circuit_path}, output_path:{output_path},'
                   f' neuron_population_name={neuron_population_name}, filter_neuron={filter_neuron})')
-            generate(circuit_path, output_path, neuron_population_name=neuron_population_name, filter_neuron=filter_neuron)
+
+            generate(circuit_path, output_path, neuron_population_name=neuron_population_name,
+                     filter_neuron=filter_neuron, astrocyte_ids=astrocyte_ids)
         else:
             msg_and_exit()
     except  GetoptError as error_msg:
