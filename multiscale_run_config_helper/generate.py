@@ -30,7 +30,7 @@ def extract_information(circuit_path:str, neuron_population_name:str, filter_neu
 
     # Create a list of astrocyte ids, that contains all the astrocytes with endfoot
     gliovascular = c.edges["gliovascular"]
-    edges_ids = np.arange(gliovascular.size, dtype=np.uint16)
+    edges_ids = np.arange(gliovascular.size, dtype=np.uint64)
     df = gliovascular.get(edges_ids, ["@target_node", "endfoot_compartment_length"])
     filtered_df = df[df.endfoot_compartment_length > 0]
     selected_astrocytes = filtered_df["@target_node"].unique()
@@ -44,7 +44,7 @@ def extract_information(circuit_path:str, neuron_population_name:str, filter_neu
 
     if filter_neuron:
         neuroglial = c.edges["neuroglial"]
-        edges_ids = np.arange(neuroglial.size, dtype=np.uint16)
+        edges_ids = np.arange(neuroglial.size, dtype=np.uint64)
         df = neuroglial.get(edges_ids, ["@source_node", "@target_node"])
         selected_neurons = df[df["@source_node"].isin(selected_astrocytes)][
             "@target_node"
