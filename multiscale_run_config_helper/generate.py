@@ -52,7 +52,7 @@ def extract_information(circuit_path:str, neuron_population_name:str, filter_neu
         neuro_df = c.nodes[neuron_population_name].get(selected_neurons)
 
     else:
-        selected_neurons = np.arange(c.nodes[neuron_population_name].size, dtype=np.uint16)
+        selected_neurons = np.arange(c.nodes[neuron_population_name].size, dtype=np.uint64)
         neuro_df = c.nodes[neuron_population_name].get(selected_neurons)
 
     print(f'INFO: There are {selected_neurons.size} selected neurons')
